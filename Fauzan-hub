@@ -1,0 +1,296 @@
+-- Roblox Script | Speed + Auto Lock + Rayfield UI | Android Compatible
+-- Executor: Synapse X / KRNL / Fluxus / Arceus X (Android)
+
+local Library = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Library:CreateWindow({
+    Name = "ADI Hub",
+    LoadingTitle = "ADI Hub Loading",
+    LoadingSubtitle = "by ADI",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "ADIHub",
+        FileName = "Config"
+    },
+    KeySystem = false
+})
+
+-- ===================== SERVICES =====================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- ===================== STATE =====================
+local SpeedEnabled = false
+local AutoLockEnabled = false
+local CurrentSpeed = 16
+local LockTarget = nil
+local LockConnection = nil
+
+-- ===================== RAYFIELD TABS =====================
+local SpeedTab = Window:CreateTab("⚡ Speed", 4483362458)
+local LockTab = Window:CreateTab("🎯 Auto Lock", 4483362458)
+local MiscTab = Window:CreateTab("⚙️ Misc", 4483362458)
+
+-- ===================== SPEED SECTION =====================
+local SpeedSection = SpeedTab:CreateSection("Speed Settings")
+
+SpeedTab:CreateToggle({
+    Name = "Speed Hack",
+    CurrentValue = false,
+    Flag = "SpeedToggle",
+    Callback = function(Value)
+        SpeedEnabled = Value
+        if not Value then
+            if Humanoid then
+                Humanoid.WalkSpeed = 16
+            end
+        end
+    end,
+})
+
+SpeedTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 500},
+    Increment = 1,
+    Suffix = " WS",
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(Value)
+        CurrentSpeed = Value
+        if SpeedEnabled and Humanoid then
+            Humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+SpeedTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 500},
+    Increment = 5,
+    Suffix = " JP",
+    CurrentValue = 50,
+    Flag = "JumpSlider",
+    Callback = function(Value)
+        if Humanoid then
+            Humanoid.JumpPower = Value
+        end
+    end,
+})
+
+SpeedTab:CreateButton({
+    Name = "Reset Speed",
+    Callback = function()
+        CurrentSpeed = 16
+        if Humanoid then
+            Humanoid.WalkSpeed = 16
+            Humanoid.JumpPower = 50
+        end
+        Library:Notify({
+            Title = "Speed Reset",
+            Content = "Speed & Jump kembali normal!",
+            Duration = 2
+        })
+    end,
+})
+
+-- ===================== SPEED LOOP =====================
+RunService.Heartbeat:Connect(function()
+    if SpeedEnabled then
+        Character = LocalPlayer.Character
+        if Character then
+            Humanoid = Character:FindFirstChildOfClass("Humanoid")
+            if Humanoid then
+                Humanoid.WalkSpeed = CurrentSpeed
+            end
+        end
+    end
+end)
+
+-- ===================== AUTO LOCK SECTION =====================
+local LockSection = LockTab:CreateSection("Auto Lock Settings")
+
+local LockRadius = 100
+local SmoothFactor = 0.15
+local LockOnTeammates = false
+
+local function GetNearest()
+    local Nearest = nil
+    local ShortestDist = LockRadius
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer then
+            if not LockOnTeammates and v.Team == LocalPlayer.Team then continue end
+            local Char = v.Character
+            if Char then
+                local Root = Char:FindFirstChild("HumanoidRootPart")
+                local Hum = Char:FindFirstChildOfClass("Humanoid")
+                if Root and Hum and Hum.Health > 0 then
+                    local Dist = (RootPart.Position - Root.Position).Magnitude
+                    if Dist < ShortestDist then
+                        ShortestDist = Dist
+                        Nearest = Root
+                    end
+                end
+            end
+        end
+    end
+
+    return Nearest
+end
+
+LockTab:CreateToggle({
+    Name = "Auto Lock On",
+    CurrentValue = false,
+    Flag = "LockToggle",
+    Callback = function(Value)
+        AutoLockEnabled = Value
+
+        if Value then
+            LockConnection = RunService.RenderStepped:Connect(function()
+                Character = LocalPlayer.Character
+                if Character then
+                    RootPart = Character:FindFirstChild("HumanoidRootPart")
+                end
+
+                LockTarget = GetNearest()
+
+                if LockTarget and AutoLockEnabled then
+                    local TargetPos = LockTarget.Position
+                    local CurrentCF = Camera.CFrame
+                    local LookCF = CFrame.lookAt(Camera.CFrame.Position, TargetPos)
+                    Camera.CFrame = CurrentCF:Lerp(LookCF, SmoothFactor)
+                end
+            end)
+        else
+            if LockConnection then
+                LockConnection:Disconnect()
+                LockConnection = nil
+                LockTarget = nil
+            end
+        end
+    end,
+})
+
+LockTab:CreateSlider({
+    Name = "Lock Radius",
+    Range = {20, 500},
+    Increment = 10,
+    Suffix = " studs",
+    CurrentValue = 100,
+    Flag = "RadiusSlider",
+    Callback = function(Value)
+        LockRadius = Value
+    end,
+})
+
+LockTab:CreateSlider({
+    Name = "Smooth Factor",
+    Range = {1, 20},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = 3,
+    Flag = "SmoothSlider",
+    Callback = function(Value)
+        SmoothFactor = Value / 20
+    end,
+})
+
+LockTab:CreateToggle({
+    Name = "Lock Teammates Too",
+    CurrentValue = false,
+    Flag = "TeamLock",
+    Callback = function(Value)
+        LockOnTeammates = Value
+    end,
+})
+
+LockTab:CreateLabel("⚠️ Auto Lock mengunci kamera ke musuh terdekat dalam radius")
+
+-- ===================== MISC SECTION =====================
+local MiscSection = MiscTab:CreateSection("Misc")
+
+MiscTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "NoclipToggle",
+    Callback = function(Value)
+        if Value then
+            RunService.Stepped:Connect(function()
+                if not Library.Flags["NoclipToggle"].Value then return end
+                local Char = LocalPlayer.Character
+                if Char then
+                    for _, Part in pairs(Char:GetDescendants()) do
+                        if Part:IsA("BasePart") and Part.CanCollide then
+                            Part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfJump",
+    Callback = function(Value)
+        if Value then
+            UserInputService.JumpRequest:Connect(function()
+                if Library.Flags["InfJump"].Value then
+                    local Char = LocalPlayer.Character
+                    if Char then
+                        local H = Char:FindFirstChildOfClass("Humanoid")
+                        if H then H:ChangeState(Enum.HumanoidStateType.Jumping) end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Teleport to Spawn",
+    Callback = function()
+        local Char = LocalPlayer.Character
+        if Char then
+            local Root = Char:FindFirstChild("HumanoidRootPart")
+            if Root then
+                Root.CFrame = CFrame.new(0, 5, 0)
+            end
+        end
+        Library:Notify({
+            Title = "Teleport",
+            Content = "Diteleport ke spawn!",
+            Duration = 2
+        })
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Destroy GUI",
+    Callback = function()
+        Library:Destroy()
+    end,
+})
+
+-- ===================== CHARACTER RESPAWN HANDLER =====================
+LocalPlayer.CharacterAdded:Connect(function(Char)
+    Character = Char
+    Humanoid = Char:WaitForChild("Humanoid")
+    RootPart = Char:WaitForChild("HumanoidRootPart")
+end)
+
+-- ===================== NOTIFY OPEN =====================
+Library:Notify({
+    Title = "ADI Hub Loaded",
+    Content = "Script berhasil diload! Selamat main 🎮",
+    Duration = 4,
+})
